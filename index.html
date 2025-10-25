@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trình Tạo Mockup Hàng Loạt</title>
+    <!-- Link to external CSS file -->
+    <link rel="stylesheet" href="styles.css"> <!-- Sử dụng đường dẫn tương đối -->
+    <!-- Load Fabric.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Thêm style cho checkbox Remove BG */
+        .remove-bg-section { margin-top: 10px; font-size: 0.9em; display: flex; align-items: center; }
+        .remove-bg-section input[type="checkbox"] { margin-right: 5px; }
+        /* Thêm style cho textarea AI */
+        .ai-gen textarea { width: calc(100% - 14px); padding: 6px; margin-bottom: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.9em; min-height: 50px; resize: vertical; display: block; background-color: #e9ecef; }
+        .ai-result-label { font-weight: 500; font-size: 0.85em; margin-top: 5px; display: block; }
+        /* Style cho nút copy */
+        .copy-button { width: auto !important; padding: 2px 6px !important; font-size: 0.75em !important; background-color: #0d6efd !important; flex-shrink: 0 !important; margin-left: 5px !important; margin-bottom: 0 !important; }
+        .ai-result-container { display: flex; align-items: flex-start; margin-bottom: 5px; } /* Đổi thành flex-start */
+        .ai-result-container textarea { flex-grow: 1; margin: 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Trình Tạo Mockup Hàng Loạt</h1>
+
+        <div class="global-controls">
+            <h3>Bước 1: Chọn màu áo (Áp dụng cho tất cả)</h3>
+            <div id="global-color-selector">Đang tải màu...</div>
+        </div>
+
+        <!-- Container cho các hàng -->
+        <div id="design-rows-container">
+            <!-- Các hàng design sẽ được thêm vào đây bằng JavaScript -->
+        </div>
+
+        <!-- Nút Thêm Hàng sẽ được di chuyển xuống đây bằng JS -->
+        <button id="addRowButton">+ Thêm Hàng Design</button>
+
+        <!-- Row Template (ẩn đi) -->
+        <template id="design-row-template">
+            <div class="design-row">
+                <button class="removeRowButton" title="Xóa hàng này">&times;</button>
+                <!-- Titles -->
+                <h3 class="controls-title">Bước 2: Tải lên design</h3>
+                <h3 class="editor-title">Bước 3: Chỉnh sửa design</h3>
+                <h3 class="result-title">Kết quả Mockup</h3>
+
+                <!-- Content Columns -->
+                <div class="controls">
+                    <div class="upload-section">
+                        <label class="design-file-label" for="">Chọn file ảnh:</label>
+                        <input type="file" class="designFile" accept="image/png, image/jpeg">
+                        <!-- Span để hiển thị tên file khi load từ localStorage -->
+                        <span class="file-name-display"></span>
+                         <!-- THÊM: Checkbox Remove Background -->
+                         <div class="remove-bg-section">
+                            <input type="checkbox" class="removeBgCheckbox" id=""> <!-- ID sẽ được set bởi JS -->
+                            <label class="remove-bg-label" for="">Xóa nền ảnh</label> <!-- for sẽ được set bởi JS -->
+                         </div>
+                    </div>
+                    <button class="createMockupButton">Bước 4: Tạo Mockup</button>
+                    <!-- THAY ĐỔI: AI Title Gen -->
+                    <div class="ai-gen">
+                         <h3>5. Title Gen AI</h3>
+                         <input type="text" class="aiKeywordInput" placeholder="Nhập từ khóa chính (vd: New York Knicks)...">
+                         <button class="generateAiBtn">Tạo Title & Tags</button>
+                         <div class="ai-result-container">
+                            <textarea class="aiTitleOutput" readonly placeholder="Tiêu đề sẽ hiện ở đây..."></textarea>
+                            <button class="copy-button copyAiTitleBtn" title="Sao chép Tiêu đề">Sao chép</button>
+                         </div>
+                         <div class="ai-result-container">
+                            <textarea class="aiTagsOutput" readonly placeholder="Tags sẽ hiện ở đây, cách nhau bởi dấu phẩy..."></textarea>
+                            <button class="copy-button copyAiTagsBtn" title="Sao chép Tags">Sao chép</button>
+                         </div>
+                    </div>
+                    <!-- KẾT THÚC THAY ĐỔI AI -->
+                    <div class="status-indicator">Trạng thái: Sẵn sàng</div>
+                </div>
+                <div class="editor">
+                     <!-- Container này sẽ là hình chữ nhật rộng -->
+                     <div class="canvas-container">
+                        <canvas class="mockup-canvas"></canvas>
+                        <!-- Vùng in ảo (hình chữ nhật nét đứt) sẽ được JS vẽ vào đây -->
+                    </div>
+                </div>
+                <div class="result">
+                    <div class="result-display">Chưa có mockup.</div>
+                    <div class="mockup-output">
+                        <div class="mockup-grid"></div>
+                        <div class="result-buttons">
+                            <button class="loadMoreButton result-button" style="display: none;">Xem thêm</button>
+                            <button class="downloadAllButton result-button" style="display: none;">Tải tất cả</button>
+                        </div>
+                     </div>
+                </div>
+            </div>
+        </template>
+        <!-- End Row Template -->
+
+        <!-- Modal Structure -->
+        <div id="imageModal" class="modal-overlay">
+            <div class="modal-content">
+                <span id="closeModalButton" class="close-button">&times;</span>
+                <img id="modalImage" src="" alt="Ảnh Mockup Lớn">
+            </div>
+        </div>
+         <!-- Simple Alert Modal -->
+        <div id="simpleModal" style="position:fixed; left:50%; top:50%; transform:translate(-50%, -50%); background-color:white; padding:20px; border:1px solid #ccc; border-radius:8px; box-shadow:0 5px 15px rgba(0,0,0,0.2); z-index:1000; display:none; min-width: 250px; text-align: center;">
+            <p id="simpleModalMessage" style="margin: 0 0 15px 0;"></p>
+            <button id="simpleModalCloseButton" style="padding: 5px 10px;">Đóng</button>
+        </div>
+
+    </div><!-- End Container -->
+
+    <script>
+        const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+        function debounce(func, wait, immediate) {
+            var timeout;
+            return function() {
+                var context = this, args = arguments;
+                var later = function() {
+                    timeout = null;
+                    if (!immediate) func.apply(context, args);
+                };
+                var callNow = immediate && !timeout;
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+                if (callNow) func.apply(context, args);
+            };
+        };
+
+
+        // --- Global Elements ---
+        const globalColorSelector = document.getElementById('global-color-selector');
+        const addRowButton = document.getElementById('addRowButton');
+        const designRowsContainer = document.getElementById('design-rows-container');
+        const designRowTemplate = document.getElementById('design-row-template');
+        const imageModal = document.getElementById('imageModal');
+        const modalImage = document.getElementById('modalImage');
+        const closeModalButton = document.getElementById('closeModalButton');
+        const simpleModal = document.getElementById('simpleModal');
+        const simpleModalMessage = document.getElementById('simpleModalMessage');
+        const simpleModalCloseButton = document.getElementById('simpleModalCloseButton');
+
+
+        // --- Global State ---
+        let productData = { placeholder_aspect_ratio: 1.237885 }; // Đặt giá trị mặc định
+        let globalSelectedVariantIds = [];
+        let designRows = [];
+
+        const SHOP_ID = 24972220; // Đảm bảo đây là 8 chữ số
+        const IMAGES_PER_PAGE = 16;
+        const snapThreshold = 5;
+
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadGlobalProductData();
+            await loadStateFromLocalStorage();
+             if (designRows.length === 0) { addRow(); } // Đảm bảo luôn có ít nhất 1 hàng
+             // Di chuyển nút Thêm Hàng
+             if (!document.body.contains(designRowsContainer.nextElementSibling) || designRowsContainer.nextElementSibling.id !== 'addRowButton') {
+                 designRowsContainer.insertAdjacentElement('afterend', addRowButton);
+             }
+            // Event listeners khác...
+             simpleModalCloseButton.onclick = () => simpleModal.style.display = 'none';
+             closeModalButton.addEventListener('click', () => { imageModal.classList.remove('visible'); modalImage.src = ''; });
+             imageModal.addEventListener('click', (event) => { if (event.target === imageModal) { imageModal.classList.remove('visible'); modalImage.src = ''; } });
+        });
+
+        // --- Global Functions ---
+        async function loadGlobalProductData() {
+            globalColorSelector.textContent = 'Đang tải màu...';
+            try {
+                // Đổi thành gọi API tương đối
+                const response = await fetch('/api/get-product-data');
+                if (!response.ok) throw new Error(`Lỗi HTTP: ${response.status}`);
+                productData = await response.json(); // Ghi đè productData
+                globalColorSelector.innerHTML = '';
+
+                if (!productData.placeholder_aspect_ratio) {
+                    productData.placeholder_aspect_ratio = 1.237885; // Fallback
+                    console.warn("API không trả về 'placeholder_aspect_ratio', dùng giá trị mặc định.");
+                }
+
+                if (productData.colors && productData.colors.length > 0) {
+                    productData.colors.forEach(color => {
+                        const container = document.createElement('div'); container.classList.add('color-swatch-container');
+                        const swatch = document.createElement('div'); swatch.classList.add('color-swatch'); swatch.dataset.variantId = color.variantId;
+                        if (color.hex) { swatch.style.backgroundImage = `url('${color.hex}')`; swatch.style.backgroundColor = '#eee'; } else { swatch.style.backgroundColor = '#ccc'; }
+                        const tooltip = document.createElement('span'); tooltip.classList.add('tooltiptext'); tooltip.textContent = color.name;
+                        container.appendChild(swatch); container.appendChild(tooltip);
+                        swatch.addEventListener('click', () => {
+                            const variantId = parseInt(swatch.dataset.variantId);
+                            if (swatch.classList.contains('selected')) { swatch.classList.remove('selected'); globalSelectedVariantIds = globalSelectedVariantIds.filter(id => id !== variantId); }
+                            else { swatch.classList.add('selected'); globalSelectedVariantIds.push(variantId); }
+                            console.log('Global Selected Variant IDs:', globalSelectedVariantIds);
+                            saveStateToLocalStorage();
+                        });
+                        globalColorSelector.appendChild(container);
+                    });
+                     restoreGlobalColorSelectionUI();
+                } else { globalColorSelector.textContent = 'Không có dữ liệu màu.'; }
+
+                // Trigger resize cho các hàng hiện có sau khi có productData
+                console.log("Triggering initial resize after product data load.");
+                debouncedResizeHandler(); // Gọi resize handler sau khi có data
+
+            } catch (error) { console.error('Lỗi tải dữ liệu SP:', error); globalColorSelector.textContent = 'Lỗi tải màu.'; }
+        }
+
+        // Tách hàm restore UI màu ra
+        function restoreGlobalColorSelectionUI() {
+            if (globalSelectedVariantIds.length > 0) {
+                 document.querySelectorAll('#global-color-selector .color-swatch').forEach(swatch => {
+                      const variantId = parseInt(swatch.dataset.variantId);
+                      if (globalSelectedVariantIds.includes(variantId)) {
+                          swatch.classList.add('selected');
+                      } else {
+                          swatch.classList.remove('selected');
+                      }
+                  });
+            }
+        }
+
+
+        function showSimpleModal(message) { simpleModalMessage.textContent = message; simpleModal.style.display = 'block'; }
+
+        // --- Row Management ---
+        addRowButton.addEventListener('click', () => {
+            addRow();
+            saveStateToLocalStorage(); // Save state khi thêm hàng
+        });
+
+        function addRow(savedRowData = null) {
+            const rowCount = designRows.length;
+            const newRowElement = designRowTemplate.content.cloneNode(true).firstElementChild;
+            const rowId = savedRowData?.id || `design-row-${Date.now()}`;
+            newRowElement.id = rowId;
+
+            // --- Gán ID duy nhất cho các elements ---
+            const fileInput = newRowElement.querySelector('.designFile');
+            const fileLabel = newRowElement.querySelector('.design-file-label');
+            const removeBgCheckbox = newRowElement.querySelector('.removeBgCheckbox');
+            const removeBgLabel = newRowElement.querySelector('.remove-bg-label');
+            const canvasElement = newRowElement.querySelector('.mockup-canvas');
+            const aiKeywordInput = newRowElement.querySelector('.aiKeywordInput');
+            const generateAiBtn = newRowElement.querySelector('.generateAiBtn');
+            const aiTitleOutput = newRowElement.querySelector('.aiTitleOutput');
+            const copyAiTitleBtn = newRowElement.querySelector('.copyAiTitleBtn');
+            const aiTagsOutput = newRowElement.querySelector('.aiTagsOutput');
+            const copyAiTagsBtn = newRowElement.querySelector('.copyAiTagsBtn');
+
+            const fileInputId = `designFile-${rowId}`;
+            const removeBgId = `removeBg-${rowId}`;
+            const canvasId = `mockup-canvas-${rowId}`;
+
+            fileInput.id = fileInputId;
+            fileLabel.setAttribute('for', fileInputId);
+            removeBgCheckbox.id = removeBgId;
+            removeBgLabel.setAttribute('for', removeBgId);
+            canvasElement.id = canvasId;
+            // --- Kết thúc gán ID ---
+
+            // --- Khôi phục nội dung AI ---
+            const rowAiKeyword = savedRowData?.aiKeyword || '';
+            const rowAiTitle = savedRowData?.aiTitle || '';
+            const rowAiTags = savedRowData?.aiTags || '';
+
+            aiKeywordInput.value = rowAiKeyword;
+            aiTitleOutput.value = rowAiTitle;
+            aiTagsOutput.value = rowAiTags;
+            // --- Kết thúc khôi phục AI ---
+
+
+            designRowsContainer.appendChild(newRowElement);
+
+            const canvasContainer = newRowElement.querySelector('.canvas-container');
+            const fabricCanvas = new fabric.Canvas(canvasId, { preserveObjectStacking: true });
+
+            // Thêm box vẽ vùng in ảo
+            const printableAreaBox = new fabric.Rect({
+                fill: 'transparent',
+                stroke: '#0d6efd', // Màu xanh dương
+                strokeWidth: 1,
+                strokeDashArray: [4, 4],
+                selectable: false,
+                evented: false,
+                objectCaching: false
+            });
+            fabricCanvas.add(printableAreaBox);
+            // Giữ viền ở trên cùng
+
+            // Gọi resize ban đầu
+            setTimeout(() => resizeCanvasForRow(fabricCanvas, canvasContainer, printableAreaBox), 50);
+
+
+            const rowState = {
+                id: rowId, element: newRowElement, canvas: fabricCanvas, canvasContainer: canvasContainer, fileInput: fileInput,
+                fileNameDisplay: newRowElement.querySelector('.file-name-display'),
+                removeBgCheckbox: removeBgCheckbox,
+                createButton: newRowElement.querySelector('.createMockupButton'), resultDisplay: newRowElement.querySelector('.result-display'),
+                mockupGrid: newRowElement.querySelector('.mockup-grid'), loadMoreButton: newRowElement.querySelector('.loadMoreButton'),
+                downloadAllButton: newRowElement.querySelector('.downloadAllButton'), resultButtonsContainer: newRowElement.querySelector('.result-buttons'),
+                statusIndicator: newRowElement.querySelector('.status-indicator'), currentDesignObject: null,
+                uploadedImageId: savedRowData?.uploadedImageId || null,
+                originalImageBase64: null,
+                originalFileName: null,
+                isDirty: savedRowData?.isDirty === true ? true : false,
+                allMockupUrls: savedRowData?.allMockupUrls || [], // Khôi phục URL mockup
+                displayedImageCount: 0, verticalLine: null, horizontalLine: null,
+                printableAreaBox: printableAreaBox,
+                aiKeywordInput: aiKeywordInput,
+                generateAiBtn: generateAiBtn,
+                aiTitleOutput: aiTitleOutput,
+                copyAiTitleBtn: copyAiTitleBtn,
+                aiTagsOutput: aiTagsOutput,
+                copyAiTagsBtn: copyAiTagsBtn,
+                aiKeyword: rowAiKeyword,
+                aiTitle: rowAiTitle,
+                aiTags: rowAiTags,
+                removeBgChecked: savedRowData?.removeBgChecked || false,
+                savedCanvasProperties: savedRowData?.canvasState || null // Lưu thuộc tính canvas
+            };
+
+            // Khôi phục trạng thái checkbox
+            rowState.removeBgCheckbox.checked = rowState.removeBgChecked;
+
+            // Restore file name and input state
+             if (savedRowData?.fileName) {
+                 rowState.fileNameDisplay.textContent = ` Đã tải: ${savedRowData.fileName} (Chọn file mới để thay đổi)`;
+                 rowState.originalFileName = savedRowData.fileName;
+                 rowState.fileInput.disabled = !!(savedRowData.uploadedImageId && !savedRowData.isDirty);
+             } else {
+                 rowState.fileInput.disabled = false;
+             }
+
+             initializeRowCanvas(rowState);
+            setupRowEventListeners(rowState);
+
+            designRows.push(rowState);
+            console.log(`Added/Restored row ${rowId}, isDirty: ${rowState.isDirty}, removeBg: ${rowState.removeBgChecked}`);
+            return rowState;
+        }
+
+         function removeRow(rowId) {
+             const rowIndex = designRows.findIndex(row => row.id === rowId);
+             if (rowIndex > -1) {
+                 const rowElement = designRows[rowIndex].element;
+                 rowElement.remove();
+                 try { if (designRows[rowIndex].canvas) designRows[rowIndex].canvas.dispose(); }
+                 catch (e) { console.error("Error disposing canvas:", e); }
+                 designRows.splice(rowIndex, 1);
+                 console.log(`Removed row ${rowId}`);
+                 saveStateToLocalStorage();
+             }
+         }
+
+        function initializeRowCanvas(rowState) {
+            const canvasInstance = rowState.canvas;
+            canvasInstance.off('object:moving');
+            canvasInstance.off('mouse:up');
+            canvasInstance.off('object:modified');
+
+            canvasInstance.on('object:moving', function(options) {
+                const obj = options.target;
+                const printableCenter = rowState.printableAreaBox.getCenterPoint();
+                const objCenter = obj.getCenterPoint();
+                let snappedV = false; let snappedH = false;
+                if (!obj || !printableCenter.x || !printableCenter.y) return;
+                if (Math.abs(objCenter.x - printableCenter.x) < snapThreshold) { obj.set({ left: printableCenter.x }).setCoords(); snappedV = true; rowState.verticalLine = showRowVGuideline(canvasInstance, rowState.verticalLine, printableCenter.x, rowState.printableAreaBox.top, rowState.printableAreaBox.getScaledHeight()); }
+                if (Math.abs(objCenter.y - printableCenter.y) < snapThreshold) { obj.set({ top: printableCenter.y }).setCoords(); snappedH = true; rowState.horizontalLine = showRowHGuideline(canvasInstance, rowState.horizontalLine, printableCenter.y, rowState.printableAreaBox.left, rowState.printableAreaBox.getScaledWidth()); }
+                if (!snappedV) rowState.verticalLine = hideRowVGuideline(canvasInstance, rowState.verticalLine);
+                if (!snappedH) rowState.horizontalLine = hideRowHGuideline(canvasInstance, rowState.horizontalLine);
+                canvasInstance.requestRenderAll();
+            });
+
+            canvasInstance.on('mouse:up', function() {
+                rowState.verticalLine = hideRowVGuideline(canvasInstance, rowState.verticalLine);
+                rowState.horizontalLine = hideRowHGuideline(canvasInstance, rowState.horizontalLine);
+                if (rowState.currentDesignObject) { debouncedSaveCanvasState(rowState); }
+            });
+
+            canvasInstance.on('object:modified', (e) => {
+                if (rowState.currentDesignObject && e.target === rowState.currentDesignObject) {
+                    if (!rowState.isDirty) {
+                        rowState.isDirty = true;
+                        rowState.uploadedImageId = null;
+                        console.log(`Design modified in row ${rowState.id}, marked as dirty.`);
+                        rowState.fileInput.disabled = false;
+                        if (rowState.fileNameDisplay) rowState.fileNameDisplay.textContent = rowState.fileNameDisplay.textContent.replace(" (Đã sửa...)", "") + " (Đã sửa, cần Tạo Mockup lại)";
+                    }
+                    debouncedSaveCanvasState(rowState);
+                }
+            });
+        }
+
+        function showRowVGuideline(canvas, currentLine, x, top, height) { if (!currentLine) { currentLine = new fabric.Line([x, top, x, top + height], { stroke: '#ff4d4f', strokeWidth: 1, selectable: false, evented: false, objectCaching: false }); canvas.add(currentLine); } else { currentLine.set({ x1: x, x2: x, y1: top, y2: top + height, visible: true }); } currentLine.bringToFront(); return currentLine; }
+        function hideRowVGuideline(canvas, currentLine) { if (currentLine) { canvas.remove(currentLine); return null;} return null; }
+        function showRowHGuideline(canvas, currentLine, y, left, width) { if (!currentLine) { currentLine = new fabric.Line([left, y, left + width, y], { stroke: '#ff4d4f', strokeWidth: 1, selectable: false, evented: false, objectCaching: false }); canvas.add(currentLine); } else { currentLine.set({ y1: y, y2: y, x1: left, x2: left + width, visible: true }); } currentLine.bringToFront(); return currentLine; }
+        function hideRowHGuideline(canvas, currentLine) { if (currentLine) { canvas.remove(currentLine); return null;} return null; }
+
+        function resizeCanvasForRow(canvasInstance, container, printableAreaBox) {
+             if (canvasInstance && container && printableAreaBox) {
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+                if (width <= 0 || height <= 0) { setTimeout(() => resizeCanvasForRow(canvasInstance, container, printableAreaBox), 100); return; }
+                if (Math.abs(canvasInstance.getWidth() - width) > 1 || Math.abs(canvasInstance.getHeight() - height) > 1) {
+                    console.log(`Resizing canvas ${canvasInstance.lowerCanvasEl.id} to ${width}x${height}`);
+                    canvasInstance.setWidth(width);
+                    canvasInstance.setHeight(height);
+                    const placeholderRatio = productData.placeholder_aspect_ratio;
+                    const canvasRatio = height / width;
+                    let realWidth, realHeight, paddingLeft, paddingTop;
+                    if (canvasRatio > placeholderRatio) { realWidth = width; realHeight = width * placeholderRatio; realWidth *= 0.98; realHeight *= 0.98; paddingTop = (height - realHeight) / 2; paddingLeft = (width - realWidth) / 2; }
+                    else { realHeight = height; const placeholderRatioWH = 1 / placeholderRatio; realWidth = height * placeholderRatioWH; realWidth *= 0.98; realHeight *= 0.98; paddingLeft = (width - realWidth) / 2; paddingTop = (height - realHeight) / 2; }
+                    printableAreaBox.set({ left: paddingLeft, top: paddingTop, width: realWidth, height: realHeight });
+                    printableAreaBox.setCoords();
+                    const design = canvasInstance.getObjects('image')[0];
+                    if (design) { const scaleX = realWidth / design.width * 0.8; const scaleY = realHeight / design.height * 0.8; const scale = Math.min(scaleX, scaleY); design.scale(scale); design.set({ left: printableAreaBox.getCenterPoint().x, top: printableAreaBox.getCenterPoint().y }); design.setCoords(); }
+                    canvasInstance.renderAll();
+                    const rowState = designRows.find(row => row.canvas === canvasInstance);
+                    if(rowState) { if (rowState.verticalLine) rowState.verticalLine = hideRowVGuideline(canvasInstance, rowState.verticalLine); if (rowState.horizontalLine) rowState.horizontalLine = hideRowHGuideline(canvasInstance, rowState.horizontalLine); }
+                }
+            }
+         }
+
+         const debouncedResizeHandler = debounce(() => { console.log("Window resized..."); designRows.forEach(rowState => { if (rowState.canvasContainer && rowState.canvas && rowState.printableAreaBox) { resizeCanvasForRow(rowState.canvas, rowState.canvasContainer, rowState.printableAreaBox); } }); }, 250);
+         window.addEventListener('resize', debouncedResizeHandler);
+
+        function setupRowEventListeners(rowState) {
+            rowState.element.querySelector('.removeRowButton').addEventListener('click', () => removeRow(rowState.id));
+            rowState.fileInput.addEventListener('change', (event) => handleDesignUpload(event, rowState));
+            rowState.createButton.addEventListener('click', () => handleCreateMockupForRow(rowState));
+            rowState.loadMoreButton.addEventListener('click', () => displayMockupGridForRow(rowState, true));
+            rowState.downloadAllButton.addEventListener('click', () => downloadAllMockupsForRow(rowState));
+            rowState.removeBgCheckbox.addEventListener('change', (event) => { rowState.removeBgChecked = event.target.checked; rowState.isDirty = true; rowState.uploadedImageId = null; console.log(`Row ${rowState.id} RemoveBG changed: ${rowState.removeBgChecked}`); saveStateToLocalStorage(); });
+            rowState.generateAiBtn.addEventListener('click', () => handleGenerateAiContent(rowState));
+            rowState.copyAiTitleBtn.addEventListener('click', () => copyToClipboard(rowState.aiTitleOutput.value, rowState.copyAiTitleBtn));
+            rowState.copyAiTagsBtn.addEventListener('click', () => copyToClipboard(rowState.aiTagsOutput.value, rowState.copyAiTagsBtn));
+            rowState.aiKeywordInput.addEventListener('input', () => { rowState.aiKeyword = rowState.aiKeywordInput.value; debouncedSaveCanvasState(rowState); });
+        }
+
+        async function handleGenerateAiContent(rowState) {
+            const rawInput = rowState.aiKeywordInput.value.trim();
+            if (!rawInput) { showSimpleModal("Vui lòng nhập từ khóa chính."); return; }
+            const titleCase = (str) => { const lowerSmall = new Set(["and","or","for","nor","but","a","an","the","in","on","at","by","to","of","up","via","with"]); const keepUpper = new Set(["NBA","NFL","MLB","NHL","MLS","NCAA","USA","UK","EU","NYC","LA","XL","XXL"]); return str.replace(/\s+/g, " ").trim().split(" ").map((w,i,arr) => { const upper = w.toUpperCase(); if (keepUpper.has(upper)) return upper; const lw = w.toLowerCase(); if (i !== 0 && i !== arr.length - 1 && lowerSmall.has(lw)) return lw; if (i > 0 && arr[i-1].endsWith('-')) return lw.charAt(0).toUpperCase() + lw.slice(1); return lw.charAt(0).toUpperCase() + lw.slice(1); }).join(" "); };
+            const userInput = titleCase(rawInput);
+            rowState.aiKeywordInput.value = userInput;
+            rowState.aiKeyword = userInput;
+            rowState.generateAiBtn.disabled = true; rowState.generateAiBtn.textContent = 'Đang tạo...'; rowState.aiTitleOutput.value = ''; rowState.aiTagsOutput.value = '';
+            try {
+                // Đổi thành gọi API tương đối
+                const response = await fetch('/api/generate-title', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userInput: userInput }), });
+                if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.message || `Lỗi API server: ${response.status}`); }
+                const result = await response.json(); const text = result.generatedText || "";
+                const titleMatch = text.match(/Item Title:\s*(.*)/i); const tagsMatch = text.match(/Tags:\s*(.*)/i); let title = titleMatch?.[1]?.trim() || ""; if (!title || !title.toLowerCase().startsWith((userInput + " crewneck sweatshirt").toLowerCase())) { title = `${userInput} Crewneck Sweatshirt` + (title ? (title.replace(/^[-,:–—]\s*/,"").startsWith(",") ? `${title}` : `, ${title}`) : ""); } title = titleCase(title); if (title.length > 140) title = title.slice(0, 140).replace(/[\s,]+$/,""); let tags = []; if (tagsMatch?.[1]) { tags = tagsMatch[1].split(",").map(t => t.trim()).filter(Boolean); } if (!tags.length || !/sweatshirt|pullover|jumper|sweater/i.test(tags[0])) { tags.unshift(`${userInput.toLowerCase()} sweatshirt`); } const seen = new Set(); tags = tags.map(t => t.toLowerCase().replace(/\s+/g, " ").trim()).filter(t => t && !seen.has(t) && (seen.add(t), true)).map(t => t.length > 20 ? t.slice(0,20).trim() : t).filter(t => t.length >= 2).slice(0, 13);
+                rowState.aiTitleOutput.value = title || "Không thể tạo tiêu đề."; rowState.aiTagsOutput.value = tags.length ? tags.join(",") : "Không thể tạo thẻ.";
+            } catch (error) { console.error("Lỗi khi gọi API AI:", error); rowState.aiTitleOutput.value = `Đã xảy ra lỗi: ${error.message}`; rowState.aiTagsOutput.value = ''; showSimpleModal(`Lỗi tạo Title/Tags: ${error.message}`);
+            } finally { rowState.generateAiBtn.disabled = false; rowState.generateAiBtn.textContent = 'Tạo Title & Tags'; rowState.aiTitle = rowState.aiTitleOutput.value; rowState.aiTags = rowState.aiTagsOutput.value; saveStateToLocalStorage(); }
+        }
+
+        function copyToClipboard(text, buttonElement) { if (!text) return; const textarea = document.createElement('textarea'); textarea.value = text; textarea.style.position = 'fixed'; textarea.style.opacity = 0; document.body.appendChild(textarea); textarea.select(); try { document.execCommand('copy'); const originalText = buttonElement.textContent; buttonElement.textContent = 'Đã chép!'; setTimeout(() => { buttonElement.textContent = originalText; }, 1500); } catch (err) { console.error('Không thể sao chép:', err); showSimpleModal('Lỗi: Không thể sao chép.'); } document.body.removeChild(textarea); }
+
+        function handleDesignUpload(event, rowState) {
+            const file = event.target.files[0];
+            if (file && rowState.canvas) {
+                rowState.originalFileName = file.name;
+                const reader = new FileReader();
+                reader.onload = function(f) {
+                    const data = f.target.result;
+                    rowState.originalImageBase64 = data.split(',')[1];
+                    fabric.Image.fromURL(data, function(img) {
+                        if (rowState.currentDesignObject) rowState.canvas.remove(rowState.currentDesignObject);
+                        if (rowState.savedCanvasProperties) {
+                            console.log("Applying saved canvas properties to re-uploaded image.");
+                            img.set({ ...rowState.savedCanvasProperties, src: data, crossOrigin: 'anonymous', originX: 'center', originY: 'center', cornerColor: 'blue', cornerSize: 8, transparentCorners: false, hasRotatingPoint: true, lockUniScaling: true, selectable: true, evented: true });
+                            rowState.savedCanvasProperties = null;
+                        } else {
+                            const realWidth = rowState.printableAreaBox.getScaledWidth(); const realHeight = rowState.printableAreaBox.getScaledHeight(); if (!realHeight || realHeight <= 0 || !realWidth || realWidth <= 0) { console.error(`Printable area invalid ${rowState.id}`); return; } const imgWidth = img.width; const imgHeight = img.height; if (!imgWidth || imgWidth <= 0 || !imgHeight || imgHeight <= 0) { console.error(`Image dimensions invalid ${rowState.id}`); return; } const scaleX = realWidth / imgWidth * 0.8; const scaleY = realHeight / imgHeight * 0.8; const scale = Math.min(scaleX, scaleY);
+                            img.set({ src: data, crossOrigin: 'anonymous', left: rowState.printableAreaBox.getCenterPoint().x, top: rowState.printableAreaBox.getCenterPoint().y, originX: 'center', originY: 'center', scaleX: scale, scaleY: scale, cornerColor: 'blue', cornerSize: 8, transparentCorners: false, hasRotatingPoint: true, lockUniScaling: true, selectable: true, evented: true });
+                        }
+                        rowState.canvas.add(img);
+                        img.sendToBack(); rowState.printableAreaBox.bringToFront();
+                        rowState.canvas.setActiveObject(img);
+                        rowState.canvas.renderAll();
+                        rowState.currentDesignObject = img;
+                        rowState.uploadedImageId = null; rowState.isDirty = true; rowState.statusIndicator.textContent = "Trạng thái: Đã tải design mới"; rowState.statusIndicator.style.backgroundColor = '#e9ecef'; rowState.statusIndicator.style.color = '#495057';
+                        if(rowState.fileNameDisplay) rowState.fileNameDisplay.textContent = ` Đã tải: ${file.name} (Chọn file mới để thay đổi)`;
+                        rowState.fileInput.disabled = false; rowState.fileInput.value = '';
+                        saveStateToLocalStorage();
+                    }, { crossOrigin: 'anonymous' });
+                }; reader.readAsDataURL(file);
+            }
+        }
+
+        async function handleCreateMockupForRow(rowState) {
+            if (globalSelectedVariantIds.length === 0) { showSimpleModal('Vui lòng chọn ít nhất một màu áo.'); return; }
+            let currentFile = rowState.fileInput.files[0]; let imageBase64ToUpload = null; let fileNameToUpload = rowState.originalFileName;
+            if (currentFile) { fileNameToUpload = currentFile.name; const reader = new FileReader(); const base64Promise = new Promise((resolve, reject) => { reader.onload = () => resolve(reader.result.split(',')[1]); reader.onerror = reject; reader.readAsDataURL(currentFile); }); imageBase64ToUpload = await base64Promise; rowState.originalImageBase64 = imageBase64ToUpload; rowState.originalFileName = fileNameToUpload; rowState.isDirty = true; rowState.uploadedImageId = null; console.log(`Row ${rowState.id}: Using new file input: ${fileNameToUpload}`); }
+            else if (rowState.originalImageBase64 && rowState.originalFileName) { imageBase64ToUpload = rowState.originalImageBase64; fileNameToUpload = rowState.originalFileName; console.log(`Row ${rowState.id}: Using stored original image: ${fileNameToUpload}`); }
+            if (!imageBase64ToUpload || !fileNameToUpload) { showSimpleModal(`Vui lòng tải lên design cho hàng ${designRows.indexOf(rowState) + 1}.`); return; }
+            if (!rowState.currentDesignObject) { showSimpleModal(`Đối tượng design không tồn tại trên canvas cho hàng ${designRows.indexOf(rowState) + 1}.`); return; }
+            rowState.statusIndicator.textContent = 'Trạng thái: Bắt đầu...'; rowState.statusIndicator.style.display = 'block'; rowState.resultDisplay.textContent = `Đang tạo mockup cho ${globalSelectedVariantIds.length} màu...`; rowState.mockupGrid.innerHTML = ''; rowState.resultButtonsContainer.style.display = 'none'; rowState.allMockupUrls = []; rowState.displayedImageCount = 0; rowState.statusIndicator.style.backgroundColor = '#cfe2ff'; rowState.statusIndicator.style.color = '#084298';
+            let createdProductIds = []; let printifyImageId = rowState.uploadedImageId; let imageBase64ForPrintify = imageBase64ToUpload; let fileNameForPrintify = fileNameToUpload;
+            try {
+                if (rowState.removeBgChecked) { if (!printifyImageId || rowState.isDirty) { rowState.statusIndicator.textContent = 'Trạng thái: Đang xóa nền...'; console.log(`Row ${rowState.id}: Removing background for ${fileNameToUpload}`); try { const removeBgResponse = await fetch('/api/remove-background', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image_base64: imageBase64ToUpload, file_name: fileNameToUpload }) }); if (!removeBgResponse.ok) { const errorData = await removeBgResponse.json(); if (removeBgResponse.status === 402) throw new Error("Hết credits Remove.bg."); throw new Error(`Remove.bg failed: ${errorData.message || removeBgResponse.statusText}`); } const removeBgData = await removeBgResponse.json(); imageBase64ForPrintify = removeBgData.result_base64; fileNameForPrintify = removeBgData.result_file_name; rowState.uploadedImageId = null; rowState.isDirty = true; console.log(`Row ${rowState.id}: Background removed. New filename: ${fileNameForPrintify}`); } catch (removeBgError) { console.error(`Row ${rowState.id}: Remove Background error -`, removeBgError); showSimpleModal(`Lỗi xóa nền: ${removeBgError.message}. Sử dụng ảnh gốc.`); imageBase64ForPrintify = imageBase64ToUpload; fileNameForPrintify = fileNameToUpload; if(rowState.isDirty || !printifyImageId) rowState.uploadedImageId = null; } } else { console.log(`Row ${rowState.id}: RemoveBG checked, using existing ID ${printifyImageId}.`); } }
+                else { imageBase64ForPrintify = imageBase64ToUpload; fileNameForPrintify = fileNameToUpload; if (rowState.isDirty || !printifyImageId) { rowState.uploadedImageId = null; rowState.isDirty = true; } console.log(`Row ${rowState.id}: RemoveBG not checked. Image: ${fileNameForPrintify}`); }
+                if (!rowState.uploadedImageId || rowState.isDirty) { rowState.statusIndicator.textContent = 'Trạng thái: Đang tải ảnh lên Printify...'; console.log(`Row ${rowState.id}: Uploading to Printify: ${fileNameForPrintify} (Dirty: ${rowState.isDirty})`); const uploadResponse = await fetch('/api/upload-image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image_base64: imageBase64ForPrintify, file_name: fileNameForPrintify }) }); if (!uploadResponse.ok) { const errorData = await uploadResponse.json(); throw new Error(`Upload Printify fail: ${errorData.message || uploadResponse.statusText}`); } const uploadData = await uploadResponse.json(); printifyImageId = uploadData.id; rowState.uploadedImageId = printifyImageId; rowState.isDirty = false; rowState.fileInput.disabled = true; if (rowState.fileNameDisplay) rowState.fileNameDisplay.textContent = ` Đã tải: ${fileNameForPrintify}`; console.log(`Upload Printify OK row ${rowState.id}, ID: ${printifyImageId}`); saveStateToLocalStorage(); }
+                else { console.log(`Row ${rowState.id}: Using existing Printify ID ${printifyImageId}.`); }
+                if (!printifyImageId) { throw new Error("Không có ID ảnh Printify hợp lệ."); }
+                const designState = rowState.currentDesignObject.toJSON(['left', 'top', 'width', 'height', 'scaleX', 'scaleY', 'angle']); const realWidth = rowState.printableAreaBox.getScaledWidth(); const realHeight = rowState.printableAreaBox.getScaledHeight(); const paddingLeft = rowState.printableAreaBox.left; const paddingTop = rowState.printableAreaBox.top; if (!realHeight || realHeight <= 0 || !realWidth || realWidth <= 0) { throw new Error("Kích thước vùng in ảo không hợp lệ."); } const realX = designState.left - paddingLeft; const realY = designState.top - paddingTop; const displayedWidth = rowState.currentDesignObject.getScaledWidth(); const printifyX = realX / realWidth; const printifyY = realY / realHeight; const printifyScale = displayedWidth / realWidth; console.log(`Sending to Printify: X=${printifyX.toFixed(4)}, Y=${printifyY.toFixed(4)}, Scale=${printifyScale.toFixed(4)} (based on printable area)`);
+                rowState.statusIndicator.textContent = `Trạng thái: Tạo SP (0/${globalSelectedVariantIds.length})...`; const createPromises = globalSelectedVariantIds.map(async (variantId, index) => { console.log(`Creating product row ${rowState.id}, variant ${variantId}...`); const payload = { shop_id: SHOP_ID, variant_id: variantId, image_id: printifyImageId, position: 'front', x: printifyX, y: printifyY, scale: printifyScale, angle: designState.angle }; try { const createResponse = await fetch('/api/create-product', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); rowState.statusIndicator.textContent = `Trạng thái: Tạo SP (${index + 1}/${globalSelectedVariantIds.length})...`; if (!createResponse.ok) { const errorData = await createResponse.json(); console.error(`Create fail row ${rowState.id}, variant ${variantId}:`, errorData); return null; } const productResult = await createResponse.json(); console.log(`Created row ${rowState.id}, variant ${variantId}: ${productResult.id}`); return productResult.id; } catch (fetchError) { console.error(`Network error creating product row ${rowState.id}, variant ${variantId}:`, fetchError); return null; } }); createdProductIds = (await Promise.all(createPromises)).filter(id => id !== null); if (createdProductIds.length === 0) { throw new Error("Không thể tạo sản phẩm nào."); } console.log(`Row ${rowState.id}: Created ${createdProductIds.length} products.`);
+                const waitTime = createdProductIds.length > 5 ? 15000 : 10000; rowState.statusIndicator.textContent = `Trạng thái: Chờ render (${waitTime/1000}s)...`; await delay(waitTime); rowState.statusIndicator.textContent = `Trạng thái: Lấy details (0/${createdProductIds.length})...`; const detailsPromises = createdProductIds.map(async (productId, index) => { try { const detailsResponse = await fetch(`/api/get-product-details?shop_id=${SHOP_ID}&product_id=${productId}`); rowState.statusIndicator.textContent = `Trạng thái: Lấy details (${index + 1}/${createdProductIds.length})...`; if (!detailsResponse.ok) { console.error(`Get details fail row ${rowState.id}, product ${productId}`); return null; } return await detailsResponse.json(); } catch (fetchError) { console.error(`Network error getting details row ${rowState.id}, product ${productId}:`, fetchError); return null; } }); const productDetailsList = (await Promise.all(detailsPromises)).filter(details => details !== null);
+                console.log(`Row ${rowState.id}: Received ${productDetailsList.length} product details. Checking images...`); productDetailsList.forEach((details, index) => { if (details && details.id) { console.log(` -> Product ${index + 1} (${details.id}): images array =`, details.images); } else { console.log(` -> Product ${index + 1}: Invalid details object received.`); } });
+                const uniqueImageUrls = new Set(); productDetailsList.forEach(details => { if (details?.images) { details.images.forEach(img => { if (img?.src) uniqueImageUrls.add(img.src); }); } }); rowState.allMockupUrls = Array.from(uniqueImageUrls); console.log(`Row ${rowState.id}: Found ${rowState.allMockupUrls.length} unique mockups.`); saveStateToLocalStorage();
+                if (rowState.allMockupUrls.length > 0) { rowState.resultDisplay.textContent = ''; displayMockupGridForRow(rowState); rowState.statusIndicator.textContent = `Trạng thái: Hoàn thành (${rowState.allMockupUrls.length} ảnh)`; rowState.statusIndicator.style.backgroundColor = '#d1e7dd'; rowState.statusIndicator.style.color = '#0f5132'; }
+                else { rowState.resultDisplay.textContent = 'Không tìm thấy ảnh mockup.'; rowState.resultButtonsContainer.style.display = 'none'; rowState.statusIndicator.textContent = 'Trạng thái: Lỗi - Không có ảnh'; rowState.statusIndicator.style.backgroundColor = '#f8d7da'; rowState.statusIndicator.style.color = '#721c24'; }
+            } catch (error) { console.error(`Error processing row ${rowState.id}:`, error); rowState.resultDisplay.textContent = `Lỗi: ${error.message}`; rowState.resultButtonsContainer.style.display = 'none'; rowState.statusIndicator.textContent = 'Trạng thái: Lỗi'; rowState.statusIndicator.style.backgroundColor = '#f8d7da'; rowState.statusIndicator.style.color = '#721c24'; if (error.message.includes("Upload") || error.message.includes("Remove.bg")) { rowState.isDirty = true; rowState.uploadedImageId = null; saveStateToLocalStorage(); } }
+        }
+
+        function displayMockupGridForRow(rowState, loadMore = false) { if (!loadMore) { rowState.mockupGrid.innerHTML = ''; rowState.displayedImageCount = 0; } const startIndex = rowState.displayedImageCount; const endIndex = Math.min(startIndex + IMAGES_PER_PAGE, rowState.allMockupUrls.length); for (let i = startIndex; i < endIndex; i++) { const imageUrl = rowState.allMockupUrls[i]; const item = document.createElement('div'); item.classList.add('mockup-item'); const img = document.createElement('img'); img.src = imageUrl; img.alt = `Mockup ${i + 1}`; img.loading = 'lazy'; const downloadBtn = document.createElement('button'); downloadBtn.classList.add('download-single-btn'); downloadBtn.innerHTML = '<i class="fas fa-download"></i>'; downloadBtn.title = 'Tải ảnh này'; downloadBtn.addEventListener('click', (e) => { e.stopPropagation(); downloadSingleImage(imageUrl, `mockup_row${designRows.findIndex(r=>r.id===rowState.id)}_${i + 1}`); }); const popup = document.createElement('div'); popup.classList.add('hover-popup'); const popupImg = document.createElement('img'); popupImg.src = imageUrl; popup.appendChild(popupImg); item.appendChild(img); item.appendChild(downloadBtn); item.appendChild(popup); item.addEventListener('click', () => { modalImage.src = imageUrl; imageModal.classList.add('visible'); }); item.addEventListener('mouseenter', (e) => positionHoverPopup(popup, item)); item.addEventListener('mouseleave', () => popup.style.display = 'none'); rowState.mockupGrid.appendChild(item); } rowState.displayedImageCount = endIndex; rowState.loadMoreButton.style.display = rowState.displayedImageCount < rowState.allMockupUrls.length ? 'inline-block' : 'none'; rowState.downloadAllButton.style.display = rowState.allMockupUrls.length > 0 ? 'inline-block' : 'none'; if (rowState.loadMoreButton.style.display !== 'none' || rowState.downloadAllButton.style.display !== 'none') { rowState.resultButtonsContainer.style.display = 'block'; } else { rowState.resultButtonsContainer.style.display = 'none'; } }
+        async function downloadSingleImage(url, filenameBase) { try { const response = await fetch(url); if (!response.ok) { console.warn(`Direct fetch failed ${url}, trying proxy...`); const proxyResponse = await fetch(`/api/download-image?url=${encodeURIComponent(url)}`); if (!proxyResponse.ok) { throw new Error(`Proxy failed: ${proxyResponse.status}`); } const blob = await proxyResponse.blob(); triggerDownload(blob, url, filenameBase); } else { const blob = await response.blob(); triggerDownload(blob, url, filenameBase); } } catch (error) { console.error('Error downloading image:', url, error); showSimpleModal(`Lỗi tải ảnh (${filenameBase}): ${error.message}`); throw error; } }
+        function triggerDownload(blob, url, filenameBase){ const objectUrl = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = objectUrl; let extension = 'jpg'; const type = blob.type.split('/')[1]; if (type && ['png', 'jpeg', 'gif', 'webp'].includes(type)) { extension = (type === 'jpeg') ? 'jpg' : type; } else { const urlParts = url.split('?')[0].split('.').pop().toLowerCase(); if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(urlParts)) { extension = (urlParts === 'jpeg') ? 'jpg' : urlParts; } } const filename = `${filenameBase}.${extension}`; link.download = filename; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(objectUrl); }
+        function positionHoverPopup(popup, item) { const itemRect = item.getBoundingClientRect(); popup.style.display = 'block'; const popupWidth = popup.offsetWidth; const popupHeight = popup.offsetHeight; popup.style.display = 'none'; const spaceRight = window.innerWidth - itemRect.right - 10; const spaceLeft = itemRect.left - 10; let top = itemRect.top; let left; if (spaceRight >= popupWidth) { left = itemRect.right + 5; } else if (spaceLeft >= popupWidth) { left = itemRect.left - popupWidth - 5; } else { left = itemRect.right + 5; } if (top + popupHeight > window.innerHeight - 10) { top = window.innerHeight - popupHeight - 10; } if (top < 10) { top = 10; } popup.style.top = `${top}px`; popup.style.left = `${left}px`; popup.style.display = 'block'; }
+        async function downloadAllMockupsForRow(rowState) { if (rowState.allMockupUrls.length === 0) return; showSimpleModal(`Đang chuẩn bị tải ${rowState.allMockupUrls.length} ảnh...`); rowState.downloadAllButton.disabled = true; rowState.downloadAllButton.textContent = 'Đang tải...'; let downloadCount = 0; for (let i = 0; i < rowState.allMockupUrls.length; i++) { const url = rowState.allMockupUrls[i]; const filenameBase = `mockup_row${designRows.findIndex(r=>r.id===rowState.id)}_${i + 1}`; try { await downloadSingleImage(url, filenameBase); downloadCount++; await delay(300); } catch (error) { console.error(`Error downloading image ${i+1}:`, error); showSimpleModal(`Lỗi tải ảnh ${i+1}. Bỏ qua.`); await delay(1500); } } showSimpleModal(`Hoàn tất. Đã cố gắng tải ${downloadCount}/${rowState.allMockupUrls.length} ảnh.`); rowState.downloadAllButton.disabled = false; rowState.downloadAllButton.textContent = 'Tải tất cả'; }
+
+        function saveStateToLocalStorage() {
+            try {
+                const stateToSave = {
+                    globalSelectedVariantIds: globalSelectedVariantIds,
+                    rows: designRows.map(rowState => ({
+                        id: rowState.id,
+                        uploadedImageId: rowState.uploadedImageId,
+                        isDirty: rowState.isDirty,
+                        // Bỏ 'src' (base64)
+                        canvasState: rowState.currentDesignObject ? rowState.currentDesignObject.toJSON(['left', 'top', 'scaleX', 'scaleY', 'angle', 'width', 'height', 'crossOrigin']) : (rowState.savedCanvasProperties || null),
+                        fileName: rowState.originalFileName,
+                        removeBgChecked: rowState.removeBgChecked,
+                        allMockupUrls: rowState.allMockupUrls,
+                        aiKeyword: rowState.aiKeyword,
+                        aiTitle: rowState.aiTitle,
+                        aiTags: rowState.aiTags,
+                    }))
+                };
+                localStorage.setItem('mockupAppState', JSON.stringify(stateToSave));
+                console.log("State saved to localStorage.");
+            } catch (e) {
+                // Kiểm tra lỗi QuotaExceededError (localStorage đầy)
+                 if (e.name === 'QuotaExceededError') {
+                    console.error("LocalStorage is full! Cannot save state.", e);
+                    showSimpleModal("Lỗi: Bộ nhớ trình duyệt đầy, không thể lưu trạng thái. Hãy thử xóa bớt hàng hoặc dữ liệu khác.");
+                 } else {
+                    console.error("Failed to save state to localStorage:", e);
+                    showSimpleModal("Lỗi: Không thể lưu trạng thái.");
+                 }
+            }
+        }
+
+        async function loadStateFromLocalStorage() {
+             const savedStateJSON = localStorage.getItem('mockupAppState');
+             if (savedStateJSON) {
+                 console.log("Found saved state, loading...");
+                 try {
+                     const savedState = JSON.parse(savedStateJSON);
+                     globalSelectedVariantIds = savedState.globalSelectedVariantIds || [];
+                     if (savedState.rows && savedState.rows.length > 0) {
+                          designRows.forEach(row => { try { if (row.canvas) row.canvas.dispose(); } catch(e){} row.element.remove(); });
+                          designRows = [];
+                         for (const rowData of savedState.rows) {
+                             const newRowState = addRow(rowData);
+                              // Không load canvas state trực tiếp nữa
+                              // Chỉ cần resize canvas
+                              await delay(150);
+                              resizeCanvasForRow(newRowState.canvas, newRowState.canvasContainer, newRowState.printableAreaBox);
+                              
+                              // Hiển thị lại mockup đã lưu
+                              if (newRowState.allMockupUrls && newRowState.allMockupUrls.length > 0) {
+                                  console.log(`Row ${newRowState.id}: Restoring ${newRowState.allMockupUrls.length} saved mockups.`);
+                                  newRowState.resultDisplay.textContent = '';
+                                  displayMockupGridForRow(newRowState);
+                              }
+                         }
+                     }
+                      console.log("State loaded from localStorage.");
+                 } catch (e) {
+                     console.error("Failed to parse or load state from localStorage:", e);
+                     localStorage.removeItem('mockupAppState');
+                     if(designRows.length === 0) addRow();
+                 }
+             } else {
+                 console.log("No saved state found in localStorage.");
+                  if(designRows.length === 0) addRow();
+             }
+              restoreGlobalColorSelectionUI();
+         }
+
+         // Hàm này không còn dùng nữa, có thể xóa
+         /*
+         function loadCanvasState(rowState, savedCanvasState, callback) {
+             // ... code cũ ...
+         }
+         */
+
+        const debouncedSaveCanvasState = debounce((rowState) => {
+             console.log(`Saving state for row ${rowState.id}`);
+             saveStateToLocalStorage();
+         }, 1000);
+
+    </script>
+
+</body>
+</html>
+`;
+
+// --- [NEW] CSS CONTENT ---
+// Nội dung file styles.css được nhúng vào đây
+const STYLES_CSS_CONTENT = `
+/* styles.css */
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f0f2f5;
+    font-size: 14px;
+    /* Định nghĩa biến CSS cho tỷ lệ khung hình */
+    --placeholder-aspect-ratio: 1.237885; /* 4941/3995 */
+}
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+h1 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #333;
+    font-size: 1.8em;
+}
+/* Global Controls */
+.global-controls {
+    background-color: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+ .global-controls h3 { margin-top: 0; font-size: 1.1em; margin-bottom: 10px; }
+#global-color-selector {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    padding-bottom: 5px; border: 1px solid #eee; padding: 10px; border-radius: 4px;
+    position: relative;
+    overflow: visible;
+    min-height: 40px;
+}
+/* Design Row Styling - More Compact */
+.design-row {
+    display: grid;
+    /* Cột 2 (editor) và 3 (result) co giãn, cột 1 (controls) cố định */
+    grid-template-columns: 280px 1fr 1fr; 
+    grid-template-rows: auto 1fr;
+    gap: 10px;
+    background-color: #fff;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    position: relative;
+    /* Bỏ min/max height để nó tự co giãn */
+    overflow: visible; /* Cho phép tooltip hiển thị */
+}
+
+.design-row > .controls,
+.design-row > .editor,
+.design-row > .result {
+     grid-row: 2;
+     border: 1px solid #e9ecef;
+     padding: 10px;
+     border-radius: 4px;
+     background-color: #fff;
+     display: flex;
+     flex-direction: column;
+     overflow: hidden;
+     min-height: 300px; /* Đặt chiều cao tối thiểu chung */
+}
+.design-row > .editor {
+    min-height: 0;
+    justify-content: center; 
+    align-items: center; 
+    padding: 5px; /* Giảm padding cho editor */
+    background-color: #f8f9fa; /* Nền xám nhạt */
+}
+
+
+.design-row h3 {
+    grid-row: 1;
+    margin-top: 0;
+    margin-bottom: 0;
+    font-size: 1em;
+    color: #495057;
+    padding-bottom: 0;
+    font-weight: 600;
+     padding-left: 10px;
+     align-self: end;
+}
+.design-row .controls-title { grid-column: 1; }
+.design-row .editor-title { grid-column: 2; }
+.design-row .result-title { grid-column: 3; }
+
+
+/* Nút Add/Remove Row */
+#addRowButton {
+    display: block; width: 100%; padding: 10px; font-size: 15px; cursor: pointer;
+    background-color: #0d6efd; color: white; border: none; border-radius: 5px; margin-top: 20px;
+}
+.removeRowButton {
+    position: absolute; top: 8px; right: 8px; background-color: #dc3545; color: white;
+    border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 11px;
+    line-height: 20px; text-align: center; cursor: pointer; padding: 0; z-index: 5;
+}
+/* --- Tooltip --- */
+.color-swatch-container { position: relative; display: inline-block; z-index: 1; }
+.color-swatch { width: 22px; height: 22px; border: 2px solid #ccc; cursor: pointer; border-radius: 50%; background-color: #eee; background-size: cover; background-position: center; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: all 0.2s; display: block; }
+.color-swatch:hover { transform: scale(1.1); }
+.color-swatch.selected { border-color: #0d6efd; box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.4); }
+.tooltiptext { visibility: hidden; width: max-content; /* Sửa lỗi tooltip */ min-width: 50px; max-width: 150px; background-color: #343a40; color: #fff; text-align: center; border-radius: 4px; padding: 4px 8px; position: absolute; z-index: 10; bottom: 135%; left: 50%; transform: translateX(-50%); opacity: 0; transition: opacity 0.2s, visibility 0s linear 0.2s; font-size: 11px; pointer-events: none; }
+.tooltiptext::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -4px; border-width: 4px; border-style: solid; border-color: #343a40 transparent transparent transparent; }
+.color-swatch-container:hover .tooltiptext { visibility: visible; opacity: 1; transition-delay: 0s; }
+/* --- Upload --- */
+.upload-section label { display: block; margin-bottom: 3px; font-weight: 500; font-size: 0.9em;}
+.designFile { margin-bottom: 8px; width: 100%; font-size: 0.9em; }
+input[type="file"]:disabled {
+    cursor: not-allowed;
+    background-color: #e9ecef; /* Sửa lỗi nút đen xì */
+    opacity: 0.7;
+}
+.file-name-display { font-size: 0.8em; margin-left: 5px; color: #6c757d; word-break: break-all; }
+
+/* --- Canvas (SỬA LỖI TỶ LỆ) --- */
+.canvas-container {
+    width: 100%;
+    margin: auto; /* Căn giữa */
+    position: relative; 
+    background-color: #fff;
+    
+    /* TRẢ LẠI LAYOUT CŨ (hình chữ nhật) */
+    /* Xóa: aspect-ratio, max-width, height: 0, padding-bottom */
+    
+    /* Thêm: Chiều cao tối thiểu để giữ hàng ngắn lại */
+    min-height: 250px;
+    height: 100%; /* Cho phép co giãn theo .editor */
+    border: 1px solid #eee; /* Thêm border thay vì dashed */
+    overflow: hidden; /* Ẩn phần thừa */
+ }
+.mockup-canvas {
+     /* Canvas sẽ được JS set kích thước 100%x100% */
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+/* --- AI Gen (Placeholder) --- */
+ .ai-gen { padding-top: 10px; border-top: 1px solid #eee; margin-top: 10px; }
+ .ai-gen h3 { margin-bottom: 5px; }
+.ai-gen input[type="text"] { width: calc(100% - 14px); padding: 6px; margin-bottom: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.9em; }
+.ai-gen button { width: 100%; padding: 6px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 5px; font-size: 0.9em;}
+.ai-result { display: flex; align-items: center; margin-bottom: 5px; }
+.ai-result span { flex-grow: 1; font-size: 0.85em; background-color: #e9ecef; padding: 4px; border-radius: 4px; margin-right: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-result button { width: auto; padding: 2px 6px; font-size: 0.75em; background-color: #0d6efd; flex-shrink: 0;}
+/* --- Buttons --- */
+ .controls .createMockupButton { margin-top: 10px; margin-bottom: 10px; }
+.result-button { padding: 6px 10px; font-size: 12px; cursor: pointer; color: white; border: none; border-radius: 4px; margin-top: 8px; width: calc(50% - 4px); display: inline-block; }
+.createMockupButton { background-color: #198754; width: 100%; padding: 8px; font-size: 1em; }
+.loadMoreButton { background-color: #0d6efd; }
+.downloadAllButton { background-color: #6c757d; }
+/* --- Result --- */
+.result-display { text-align: center; margin-bottom: 8px; font-style: italic; color: #6c757d; font-size: 0.9em; flex-shrink: 0;}
+.mockup-output { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
+.mockup-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 6px; margin-top: 8px; position: relative; flex-grow: 1; overflow-y: auto; padding: 5px; }
+.mockup-item { position: relative; cursor: pointer; overflow: hidden; border-radius: 4px; border: 1px solid #eee; background-color: #f8f9fa; aspect-ratio: 1 / 1; display: flex; justify-content: center; align-items: center; } 
+.mockup-item img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; } 
+.download-single-btn { position: absolute; bottom: 3px; right: 3px; background-color: rgba(0, 0, 0, 0.5); color: white; border: none; border-radius: 3px; width: 20px; height: 20px; font-size: 10px; line-height: 20px; text-align: center; cursor: pointer; opacity: 0; transition: opacity 0.2s; padding: 0; z-index: 2; display: flex; justify-content: center; align-items: center; } 
+.mockup-item:hover .download-single-btn { opacity: 1; }
+.download-single-btn i { pointer-events: none; }
+.hover-popup { display: none; position: fixed; width: 150px; border: 1px solid #ccc; background-color: white; padding: 5px; box-shadow: 0 5px 10px rgba(0,0,0,0.2); z-index: 20; pointer-events: none; border-radius: 4px; }
+.hover-popup img { width: 100%; height: auto; }
+.result-buttons { margin-top: auto; flex-shrink: 0; padding-top: 10px; border-top: 1px solid #eee; text-align: center; }
+.loading-indicator, .status-indicator { display: none; text-align: center; padding: 5px; font-weight: 500; font-size: 0.85em; margin-top: 8px; border-radius: 4px; }
+.status-indicator { background-color: #e9ecef; color: #495057; }
+/* --- Modal --- */
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); z-index: 999; justify-content: center; align-items: center; display: flex; visibility: hidden; opacity: 0; transition: visibility 0s linear 0.3s, opacity 0.3s linear; }
+.modal-overlay.visible { visibility: visible; opacity: 1; transition-delay: 0s; }
+.modal-content { position: relative; background-color: white; padding: 20px; border-radius: 5px; max-width: 80%; max-height: 80%; overflow: auto; transform: scale(0.9); transition: transform 0.3s ease-out; }
+.modal-overlay.visible .modal-content { transform: scale(1); }
+.modal-content img { display: block; max-width: 100%; max-height: calc(80vh - 60px); margin: 0 auto; }
+.close-button { position: absolute; top: -10px; right: -10px; background-color: #333; color: white; border: none; border-radius: 50%; width: 30px; height: 30px; font-size: 20px; line-height: 30px; text-align: center; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+
+/* Responsive */
+ @media (max-width: 1200px) {
+     .design-row { grid-template-columns: 220px 1fr 1fr; gap: 10px;}
+     body { padding: 15px;}
+ }
+@media (max-width: 992px) {
+    .design-row { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto 1fr; max-height: none; overflow: visible; min-height: unset; }
+    .design-row .controls-title { grid-column: 1; grid-row: 1;}
+    .design-row .result-title { grid-column: 2; grid-row: 1;}
+    .design-row .editor-title { grid-column: 1 / -1; grid-row: 2;}
+    .design-row .controls { grid-column: 1; grid-row: 3;}
+    .design-row .editor { grid-column: 1 / -1; grid-row: 4; min-height: 250px; }
+    .design-row .result { grid-column: 2; grid-row: 3;}
+     .mockup-grid { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); }
+     .controls, .result { min-height: 250px; }
+}
+@media (max-width: 768px) {
+    body { padding: 10px; font-size: 13px; }
+    h1 { font-size: 1.5em; margin-bottom: 15px;}
+    .global-controls h3 { font-size: 1em;}
+    .design-row { grid-template-columns: 1fr; grid-template-rows: auto auto auto auto auto auto; gap: 10px; padding: 8px; max-height: none; overflow: visible; min-height: unset; }
+     .design-row > div { padding: 8px; }
+     .design-row h3 { font-size: 0.95em; padding-left: 0;}
+     .design-row .controls-title, .design-row .editor-title, .design-row .result-title,
+     .design-row .controls, .design-row .editor, .design-row .result { grid-column: 1; }
+     .design-row .controls-title { grid-row: 1;} .design-row .controls { grid-row: 2;}
+     .design-row .editor-title { grid-row: 3;} .design-row .editor { grid-row: 4;}
+     .design-row .result-title { grid-row: 5;} .design-row .result { grid-row: 6;}
+     .mockup-grid { grid-template-columns: repeat(auto-fill, minmax(55px, 1fr)); gap: 4px; }
+     .hover-popup { display: none !important; }
+     .controls, .editor, .result { min-height: auto; }
+     #addRowButton { font-size: 14px; padding: 8px;}
+     .createMockupButton { font-size: 0.95em; padding: 8px;}
+}
+`;
+
+// Nội dung của file ai_prompt.txt được nhúng trực tiếp vào đây
+const AI_PROMPT_TEMPLATE = `You are a Senior Etsy Keyword Analyst & SEO Copywriter specializing in apparel (sweatshirts/crewnecks). Think in terms of search intent, CTR, and conversion on the Etsy US marketplace.
+
+PRODUCT CONTEXT:
+
+Category: Apparel > Tops & Tees > Crewneck Sweatshirt
+
+Main entity (user keyword): "\${userInput}"
+
+Required opening phrase of the title (exact, Title Case): "\${userInput} Crewneck Sweatshirt"
+
+CORE GOAL:
+Generate (1) an SEO-optimized Item Title (Title Case) and (2) up to 13 optimized Tags that expand relevant reach while staying natural and fully compliant with Etsy's policies.
+
+KEYWORD INTERPRETATION ENGINE (use all that apply from the keyword and common buyer intents):
+
+Entity & fandom: team/artist/city/college/state/mascot (e.g., Knicks, NYC)
+
+Style hooks: vintage, retro, streetwear, minimal, classic, Y2K, varsity, collegiate
+
+Synonyms: sweatshirt, pullover, jumper, sweater (use variants in title/tags wisely, avoid repetition)
+
+Fit & features: unisex, cozy, soft fleece, warm, oversized, relaxed fit
+
+Season & use-case: fall/winter, game day, everyday wear, layering
+
+Gifting: birthday gift, holiday gift, Christmas gift, fan gift
+
+Audience: men, women, unisex, teen, student, alumni, fan
+
+Compliance: avoid trademark misuse or prohibited claims
+
+TITLE RULES:
+
+Format: Title Case (Capitalize Major Words; keep acronyms like NBA/USA uppercase).
+
+Length: ≤ 140 characters.
+
+Start with exactly: "\${userInput} Crewneck Sweatshirt"
+
+Then add 2–3 distinct descriptive phrases (comma-separated) prioritizing high-intent search terms in the first 60–70 chars.
+
+Use 1–2 focus keyword phrases that also appear in tags.
+
+Keep human-readable, non-spammy; creativity must support clarity and SEO.
+
+Consider synonyms once (e.g., “Vintage NBA Basketball Pullover”) to widen reach without keyword stuffing.
+
+TAGS RULES (Etsy “Tags” field):
+
+Up to 13 tags, each ≤ 20 characters, multi-word where possible, comma-separated.
+
+Tag #1 should be the strongest descriptor (e.g., "\${userInput} sweatshirt").
+
+Include 1–2 focus phrases from the title.
+
+Diversify: style, audience, season, gift intent, vibe (e.g., "retro nba merch", "cozy fan gift").
+
+No duplicates, no intentional misspellings, avoid words covered by category unless part of a distinct phrase.
+
+Stay within policy.
+
+OUTPUT FORMAT (exactly this, no extra lines):
+Item Title: [140-char max Title in Title Case]
+Tags: tag1,tag2,tag3,…,tag13
+
+EXAMPLE STYLE (for reference only, do not copy verbatim):
+"New York Knicks Crewneck Sweatshirt, Vintage NBA Basketball Pullover, Unisex Streetwear Jumper, Cozy Winter Fan Gift"
+
+Now generate the Title and Tags for the keyword "\${userInput}" following all the rules.`;
+
+// --- Biến Global ---
+const SHOP_ID_DEFAULT = 24972220;
+const BLUEPRINT_ID_DEFAULT = 49;
+const PRINT_PROVIDER_ID_DEFAULT = 29;
+
+// --- Helpers ---
+
+/**
+ * Trả về một Response object với JSON và headers CORS
+ */
+function corsResponse(data, status = 200) {
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Content-Type': 'application/json'
+  };
+  return new Response(JSON.stringify(data), { status, headers });
+}
+
+/**
+ * Xử lý lỗi và trả về lỗi CORS
+ */
+function handleError(message, error, status = 500) {
+  console.error(message, error);
+  // Cố gắng lấy thêm chi tiết lỗi nếu có
+  const errorDetails = error?.response?.data || error?.message || error;
+  return corsResponse({ message, error: errorDetails }, status);
+}
+
+/**
+ * Lấy headers cho Printify API
+ */
+const getPrintifyApiHeaders = (env) => ({
+  'Authorization': `Bearer ${env.PRINTIFY_API_TOKEN}`,
+  'Content-Type': 'application/json;charset=utf-8'
+});
+
+/**
+ * Chuyển ArrayBuffer (từ fetch) sang Base64
+ */
+function bufferToBase64(buffer) {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary); // btoa có sẵn trong môi trường Worker
+}
+
+// --- Main Worker Logic ---
+
+export default {
+  async fetch(request, env, ctx) {
+    // Xử lý request OPTIONS (preflight) cho CORS
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        }
+      });
+    }
+
+    const url = new URL(request.url);
+    const path = url.pathname;
+
+    try {
+      // --- [NEW] Routing cho Frontend ---
+      // Bỏ routing cho frontend vì sẽ dùng Pages
+      // if (path === '/') { ... }
+      // if (path === '/styles.css') { ... }
+      
+      // --- Routing cho API (Giữ nguyên) ---
+      if (path === '/api/get-product-data' && request.method === 'GET') {
+        return await handleGetProductData(request, env);
+      }
+      if (path === '/api/upload-image' && request.method === 'POST') {
+        return await handleUploadImage(request, env);
+      }
+      if (path === '/api/create-product' && request.method === 'POST') {
+        return await handleCreateProduct(request, env);
+      }
+      if (path === '/api/get-product-details' && request.method === 'GET') {
+        return await handleGetProductDetails(request, env);
+      }
+      if (path === '/api/download-image' && request.method === 'GET') {
+        return await handleDownloadImage(request, env);
+      }
+      if (path === '/api/generate-title' && request.method === 'POST') {
+        return await handleGenerateTitle(request, env);
+      }
+      if (path === '/api/remove-background' && request.method === 'POST') {
+        return await handleRemoveBackground(request, env);
+      }
+
+      // Nếu không khớp API nào, trả về 404
+      return corsResponse({ message: `API Route not found: ${request.method} ${path}` }, 404);
+
+    } catch (error) {
+      // Bắt lỗi chung
+      if (error instanceof SyntaxError) {
+         return handleError('Invalid JSON body', error.message, 400);
+      }
+      return handleError('Unhandled worker error', error.message, 500);
+    }
+  }
+};
+
+// --- Handlers cho từng Route (Giữ nguyên từ đây) ---
+// ... (Toàn bộ code các hàm handle... từ phiên bản trước) ...
+
+async function handleGetProductData(request, env) {
+  try {
+    const response = await fetch(
+      `https://api.printify.com/v1/catalog/blueprints/${BLUEPRINT_ID_DEFAULT}/print_providers/${PRINT_PROVIDER_ID_DEFAULT}/variants.json`,
+      { headers: getPrintifyApiHeaders(env) }
+    );
+    if (!response.ok) throw new Error(`Printify API error: ${response.statusText}`);
+    
+    const data = await response.json();
+    const variantsData = data.variants || [];
+
+    const placeholderFront = variantsData[0]?.placeholders?.find(p => p.position === 'front');
+    let placeholderAspectRatio = 1.237885;
+    if (placeholderFront && placeholderFront.width && placeholderFront.height) {
+      placeholderAspectRatio = placeholderFront.height / placeholderFront.width;
+    }
+
+    const uniqueColors = {};
+    variantsData.forEach(variant => {
+      const colorName = variant.options.color;
+      if (colorName && !uniqueColors[colorName]) {
+        uniqueColors[colorName] = { name: colorName, variantId: variant.id, hex: null };
+      }
+    });
+
+    const colorSwatches = { "White": "https://images-merch.printify.com/api/file/5853fec7ce46f30f8328200a", "Ash": "https://images-merch.printify.com/api/file/5853fecfce46f30f832820b2", "Sport Grey": "https://images-merch.printify.com/api/file/5853fecfce46f30f832820b5", "Sand": "https://images-merch.printify.com/api/file/5853fecbce46f30f83282061", "Light Blue": "https://images-merch.printify.com/api/file/5853fecece46f30f832820dd", "Light Pink": "https://images-merch.printify.com/api/file/5853fecdce46f30f832820ab", "Gold": "https://images-merch.printify.com/api/file/5853fecace46f30f83282046", "Orange": "https://images-merch.printify.com/api/file/5853fecace46f30f83282040", "Irish Green": "https://images-merch.printify.com/api/file/5853fecace46f30f8328204c", "Royal": "https://images-merch.printify.com/api/file/5853fecdce46f30f832820c6", "Carolina Blue": "https://images-merch.printify.com/api/file/5853fecdce46f30f832820b9", "Sapphire": "https://images-merch.printify.com/api/file/5853fecbce46f30f83282067", "Red": "https://images-merch.printify.com/api/file/5853fecece46f30f832820d7", "Maroon": "https://images-merch.printify.com/api/file/5853fecfce46f30f832820fa", "Garnet": "https://images-merch.printify.com/api/file/5853fecece46f30f832820ea", "Dark Heather": "https://images-merch.printify.com/api/file/5853fed0ce46f30f8328211b", "Navy": "https://images-merch.printify.com/api/file/5853fecece46f30f832820e1", "Purple": "https://images-merch.printify.com/api/file/5853fecece46f30f832820e4", "Forest Green": "https://images-merch.printify.com/api/file/5853fecace46f30f83282049", "Military Green": "https://images-merch.printify.com/api/file/5853fecace46f30f83282052", "Black": "https://images-merch.printify.com/api/file/5853fecdce46f30f832820ac", "Charcoal": "https://images-merch.printify.com/api/file/5853fecace46f30f83282043" };
+
+    const finalColors = Object.values(uniqueColors).map(color => {
+      color.hex = colorSwatches[color.name] || null;
+      return color;
+    });
+
+    return corsResponse({
+      colors: finalColors,
+      placeholder_aspect_ratio: placeholderAspectRatio
+    });
+  } catch (error) {
+    return handleError('[GET_PRODUCT_DATA] Lỗi', error.message, 500);
+  }
+}
+
+async function handleUploadImage(request, env) {
+  const { image_base64, file_name } = await request.json();
+  if (!image_base64 || !file_name) return handleError('Thiếu image_base64 hoặc file_name', null, 400);
+
+  try {
+    const response = await fetch('https://api.printify.com/v1/uploads/images.json', {
+      method: 'POST',
+      headers: getPrintifyApiHeaders(env),
+      body: JSON.stringify({
+        "file_name": file_name,
+        "contents": image_base64
+      })
+    });
+    if (!response.ok) {
+        const err = await response.json();
+        throw new Error(JSON.stringify(err.errors || err));
+    }
+    
+    const data = await response.json();
+    
+    // Đợi 5 giây cho Printify xử lý
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    
+    return corsResponse(data);
+  } catch (error) {
+    return handleError(`[UPLOAD_PRINTIFY] Lỗi tải ảnh ${file_name}`, error.message, 500);
+  }
+}
+
+async function handleCreateProduct(request, env) {
+  const { shop_id, variant_id, image_id, position, x, y, scale, angle } = await request.json();
+  if (!shop_id || !variant_id || !image_id || position === undefined || x === undefined || y === undefined || scale === undefined || angle === undefined) {
+    return handleError('Thiếu thông tin cần thiết', null, 400);
+  }
+
+  const payload = {
+    "title": `API Test Product ${variant_id}`,
+    "description": "Auto-generated product for mockup.",
+    "blueprint_id": BLUEPRINT_ID_DEFAULT,
+    "print_provider_id": PRINT_PROVIDER_ID_DEFAULT,
+    "variants": [{ "id": variant_id, "price": 1500, "is_enabled": true }],
+    "print_areas": [{
+      "variant_ids": [variant_id],
+      "placeholders": [{
+        "position": position,
+        "images": [{ "id": image_id, "x": x, "y": y, "scale": scale, "angle": angle }]
+      }]
+    }]
+  };
+
+  try {
+    const response = await fetch(
+      `https://api.printify.com/v1/shops/${shop_id}/products.json`, {
+        method: 'POST',
+        headers: getPrintifyApiHeaders(env),
+        body: JSON.stringify(payload)
+      }
+    );
+    if (!response.ok) {
+        const err = await response.json();
+        throw new Error(JSON.stringify(err.errors || err));
+    }
+    const data = await response.json();
+    return corsResponse(data);
+  } catch (error) {
+    return handleError(`[CREATE_PRODUCT] Lỗi tạo SP ${variant_id}`, error.message, 500);
+  }
+}
+
+async function handleGetProductDetails(request, env) {
+  const url = new URL(request.url);
+  const shop_id = url.searchParams.get('shop_id');
+  const product_id = url.searchParams.get('product_id');
+  
+  if (!shop_id || !product_id) return handleError('Thiếu shop_id hoặc product_id', null, 400);
+
+  try {
+    const response = await fetch(
+      `https://api.printify.com/v1/shops/${shop_id}/products/${product_id}.json`,
+      { headers: getPrintifyApiHeaders(env) }
+    );
+    if (!response.ok) {
+        const err = await response.json();
+        throw new Error(JSON.stringify(err.errors || err));
+    }
+    const data = await response.json();
+    return corsResponse(data);
+  } catch (error) {
+    return handleError(`[GET_DETAILS] Lỗi lấy SP ${product_id}`, error.message, 500);
+  }
+}
+
+async function handleDownloadImage(request, env) {
+  const url = new URL(request.url);
+  const imageUrl = url.searchParams.get('url');
+  if (!imageUrl) return handleError('Thiếu URL ảnh', null, 400);
+
+  try {
+    // Fetch ảnh
+    const response = await fetch(imageUrl);
+    if (!response.ok) throw new Error(`Proxy image failed: ${response.statusText}`);
+
+    // Trả về response ảnh trực tiếp, nhưng thêm header CORS
+    const newHeaders = new Headers(response.headers);
+    newHeaders.set('Access-Control-Allow-Origin', '*');
+    
+    return new Response(response.body, {
+      status: response.status,
+      headers: newHeaders
+    });
+  } catch (error) {
+    return handleError(`[DOWNLOAD_PROXY] Lỗi proxy ${imageUrl}`, error.message, 500);
+  }
+}
+
+async function handleGenerateTitle(request, env) {
+  const { userInput } = await request.json();
+  if (!userInput) return handleError('Thiếu userInput', null, 400);
+  if (!env.GEMINI_API_KEY) return handleError('GEMINI_API_KEY chưa được cấu hình', null, 500);
+
+  const finalPrompt = AI_PROMPT_TEMPLATE.replace(/\$\{userInput\}/g, userInput);
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${env.GEMINI_API_KEY}`;
+  const payload = { contents: [{ parts: [{ text: finalPrompt }] }] };
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(JSON.stringify(err.error || err));
+    }
+    
+    const result = await response.json();
+    const text = result?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    return corsResponse({ generatedText: text });
+  } catch (error) {
+    return handleError(`[AI_TITLE_GEN] Lỗi Gemini API`, error.message, 500);
+  }
+}
+
+async function handleRemoveBackground(request, env) {
+  const { image_base64, file_name } = await request.json();
+  if (!image_base64 || !file_name) return handleError('Thiếu image_base64 hoặc file_name', null, 400);
+  if (!env.REMOVEBG_API_KEY_1) return handleError('REMOVEBG_API_KEY_1 chưa được cấu hình', null, 500);
+
+  try {
+    const formData = new FormData();
+    formData.append('image_file_b64', image_base64);
+    formData.append('size', 'auto');
+    formData.append('format', 'png');
+
+    const response = await fetch('https://api.remove.bg/v1.0/removebg', {
+      method: 'POST',
+      headers: {
+        'X-API-Key': env.REMOVEBG_API_KEY_1
+      },
+      body: formData // fetch tự xử lý multipart headers khi body là FormData
+    });
+    
+    // Kiểm tra lỗi hết credits trước
+    if (response.status === 402) {
+        throw new Error("Hết credits Remove.bg.");
+    }
+    // Kiểm tra các lỗi khác
+    if (!response.ok) {
+       // Cẩn thận đọc text() vì nó tiêu thụ body, chỉ đọc nếu thực sự là lỗi
+       const errText = await response.text(); 
+       throw new Error(`Remove.bg error: ${response.statusText} - ${errText}`);
+    }
+
+    // Nhận về ArrayBuffer
+    const buffer = await response.arrayBuffer();
+    // Chuyển sang base64
+    const resultBase64 = bufferToBase64(buffer);
+    // Tạo tên file mới
+    const resultFileName = file_name.replace(/(\.[\w\d_-]+)$/i, '_nobg$1');
+
+    // Trả về kết quả thành công
+    return corsResponse({
+      result_base64: resultBase64,
+      result_file_name: resultFileName
+    });
+
+  } catch (error) {
+    // Bắt lỗi (bao gồm lỗi fetch, lỗi throw new Error ở trên)
+    return handleError(`[REMOVE_BG] Lỗi xóa nền ${file_name || 'không rõ'}`, error.message, 500);
+  }
+}
+
