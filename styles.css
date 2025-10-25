@@ -1,0 +1,213 @@
+/* styles.css */
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f0f2f5;
+    font-size: 14px;
+    /* Định nghĩa biến CSS cho tỷ lệ khung hình */
+    --placeholder-aspect-ratio: 1.237885; /* 4941/3995 */
+}
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+h1 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #333;
+    font-size: 1.8em;
+}
+/* Global Controls */
+.global-controls {
+    background-color: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+ .global-controls h3 { margin-top: 0; font-size: 1.1em; margin-bottom: 10px; }
+#global-color-selector {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    padding-bottom: 5px; border: 1px solid #eee; padding: 10px; border-radius: 4px;
+    position: relative;
+    overflow: visible;
+    min-height: 40px;
+}
+/* Design Row Styling - More Compact */
+.design-row {
+    display: grid;
+    /* Cột 2 (editor) và 3 (result) co giãn, cột 1 (controls) cố định */
+    grid-template-columns: 280px 1fr 1fr; 
+    grid-template-rows: auto 1fr;
+    gap: 10px;
+    background-color: #fff;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    position: relative;
+    /* Bỏ min/max height để nó tự co giãn */
+    overflow: visible; /* Cho phép tooltip hiển thị */
+}
+
+.design-row > .controls,
+.design-row > .editor,
+.design-row > .result {
+     grid-row: 2;
+     border: 1px solid #e9ecef;
+     padding: 10px;
+     border-radius: 4px;
+     background-color: #fff;
+     display: flex;
+     flex-direction: column;
+     overflow: hidden;
+     min-height: 300px; /* Đặt chiều cao tối thiểu chung */
+}
+.design-row > .editor {
+    min-height: 0;
+    justify-content: center; 
+    align-items: center; 
+    padding: 5px; /* Giảm padding cho editor */
+    background-color: #f8f9fa; /* Nền xám nhạt */
+}
+
+
+.design-row h3 {
+    grid-row: 1;
+    margin-top: 0;
+    margin-bottom: 0;
+    font-size: 1em;
+    color: #495057;
+    padding-bottom: 0;
+    font-weight: 600;
+     padding-left: 10px;
+     align-self: end;
+}
+.design-row .controls-title { grid-column: 1; }
+.design-row .editor-title { grid-column: 2; }
+.design-row .result-title { grid-column: 3; }
+
+
+/* Nút Add/Remove Row */
+#addRowButton {
+    display: block; width: 100%; padding: 10px; font-size: 15px; cursor: pointer;
+    background-color: #0d6efd; color: white; border: none; border-radius: 5px; margin-top: 20px;
+}
+.removeRowButton {
+    position: absolute; top: 8px; right: 8px; background-color: #dc3545; color: white;
+    border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 11px;
+    line-height: 20px; text-align: center; cursor: pointer; padding: 0; z-index: 5;
+}
+/* --- Tooltip --- */
+.color-swatch-container { position: relative; display: inline-block; z-index: 1; }
+.color-swatch { width: 22px; height: 22px; border: 2px solid #ccc; cursor: pointer; border-radius: 50%; background-color: #eee; background-size: cover; background-position: center; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: all 0.2s; display: block; }
+.color-swatch:hover { transform: scale(1.1); }
+.color-swatch.selected { border-color: #0d6efd; box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.4); }
+.tooltiptext { visibility: hidden; width: max-content; /* Sửa lỗi tooltip */ min-width: 50px; max-width: 150px; background-color: #343a40; color: #fff; text-align: center; border-radius: 4px; padding: 4px 8px; position: absolute; z-index: 10; bottom: 135%; left: 50%; transform: translateX(-50%); opacity: 0; transition: opacity 0.2s, visibility 0s linear 0.2s; font-size: 11px; pointer-events: none; }
+.tooltiptext::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -4px; border-width: 4px; border-style: solid; border-color: #343a40 transparent transparent transparent; }
+.color-swatch-container:hover .tooltiptext { visibility: visible; opacity: 1; transition-delay: 0s; }
+/* --- Upload --- */
+.upload-section label { display: block; margin-bottom: 3px; font-weight: 500; font-size: 0.9em;}
+.designFile { margin-bottom: 8px; width: 100%; font-size: 0.9em; }
+input[type="file"]:disabled {
+    cursor: not-allowed;
+    background-color: #e9ecef; /* Sửa lỗi nút đen xì */
+    opacity: 0.7;
+}
+.file-name-display { font-size: 0.8em; margin-left: 5px; color: #6c757d; word-break: break-all; }
+
+/* --- Canvas (SỬA LỖI TỶ LỆ) --- */
+.canvas-container {
+    width: 100%;
+    margin: auto; /* Căn giữa */
+    position: relative; 
+    background-color: #fff;
+    
+    /* TRẢ LẠI LAYOUT CŨ (hình chữ nhật) */
+    /* Xóa: aspect-ratio, max-width, height: 0, padding-bottom */
+    
+    /* Thêm: Chiều cao tối thiểu để giữ hàng ngắn lại */
+    min-height: 250px;
+    height: 100%; /* Cho phép co giãn theo .editor */
+    border: 1px solid #eee; /* Thêm border thay vì dashed */
+    overflow: hidden; /* Ẩn phần thừa */
+ }
+.mockup-canvas {
+     /* Canvas sẽ được JS set kích thước 100%x100% */
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+/* --- AI Gen (Placeholder) --- */
+ .ai-gen { padding-top: 10px; border-top: 1px solid #eee; margin-top: 10px; }
+ .ai-gen h3 { margin-bottom: 5px; }
+.ai-gen input[type="text"] { width: calc(100% - 14px); padding: 6px; margin-bottom: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.9em; }
+.ai-gen button { width: 100%; padding: 6px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 5px; font-size: 0.9em;}
+.ai-result { display: flex; align-items: center; margin-bottom: 5px; }
+.ai-result span { flex-grow: 1; font-size: 0.85em; background-color: #e9ecef; padding: 4px; border-radius: 4px; margin-right: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-result button { width: auto; padding: 2px 6px; font-size: 0.75em; background-color: #0d6efd; flex-shrink: 0;}
+/* --- Buttons --- */
+ .controls .createMockupButton { margin-top: 10px; margin-bottom: 10px; }
+.result-button { padding: 6px 10px; font-size: 12px; cursor: pointer; color: white; border: none; border-radius: 4px; margin-top: 8px; width: calc(50% - 4px); display: inline-block; }
+.createMockupButton { background-color: #198754; width: 100%; padding: 8px; font-size: 1em; }
+.loadMoreButton { background-color: #0d6efd; }
+.downloadAllButton { background-color: #6c757d; }
+/* --- Result --- */
+.result-display { text-align: center; margin-bottom: 8px; font-style: italic; color: #6c757d; font-size: 0.9em; flex-shrink: 0;}
+.mockup-output { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
+.mockup-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 6px; margin-top: 8px; position: relative; flex-grow: 1; overflow-y: auto; padding: 5px; }
+.mockup-item { position: relative; cursor: pointer; overflow: hidden; border-radius: 4px; border: 1px solid #eee; background-color: #f8f9fa; aspect-ratio: 1 / 1; display: flex; justify-content: center; align-items: center; } 
+.mockup-item img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; } 
+.download-single-btn { position: absolute; bottom: 3px; right: 3px; background-color: rgba(0, 0, 0, 0.5); color: white; border: none; border-radius: 3px; width: 20px; height: 20px; font-size: 10px; line-height: 20px; text-align: center; cursor: pointer; opacity: 0; transition: opacity 0.2s; padding: 0; z-index: 2; display: flex; justify-content: center; align-items: center; } 
+.mockup-item:hover .download-single-btn { opacity: 1; }
+.download-single-btn i { pointer-events: none; }
+.hover-popup { display: none; position: fixed; width: 150px; border: 1px solid #ccc; background-color: white; padding: 5px; box-shadow: 0 5px 10px rgba(0,0,0,0.2); z-index: 20; pointer-events: none; border-radius: 4px; }
+.hover-popup img { width: 100%; height: auto; }
+.result-buttons { margin-top: auto; flex-shrink: 0; padding-top: 10px; border-top: 1px solid #eee; text-align: center; }
+.loading-indicator, .status-indicator { display: none; text-align: center; padding: 5px; font-weight: 500; font-size: 0.85em; margin-top: 8px; border-radius: 4px; }
+.status-indicator { background-color: #e9ecef; color: #495057; }
+/* --- Modal --- */
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); z-index: 999; justify-content: center; align-items: center; display: flex; visibility: hidden; opacity: 0; transition: visibility 0s linear 0.3s, opacity 0.3s linear; }
+.modal-overlay.visible { visibility: visible; opacity: 1; transition-delay: 0s; }
+.modal-content { position: relative; background-color: white; padding: 20px; border-radius: 5px; max-width: 80%; max-height: 80%; overflow: auto; transform: scale(0.9); transition: transform 0.3s ease-out; }
+.modal-overlay.visible .modal-content { transform: scale(1); }
+.modal-content img { display: block; max-width: 100%; max-height: calc(80vh - 60px); margin: 0 auto; }
+.close-button { position: absolute; top: -10px; right: -10px; background-color: #333; color: white; border: none; border-radius: 50%; width: 30px; height: 30px; font-size: 20px; line-height: 30px; text-align: center; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+
+/* Responsive */
+ @media (max-width: 1200px) {
+     .design-row { grid-template-columns: 220px 1fr 1fr; gap: 10px;}
+     body { padding: 15px;}
+ }
+@media (max-width: 992px) {
+    .design-row { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto 1fr; max-height: none; overflow: visible; min-height: unset; }
+    .design-row .controls-title { grid-column: 1; grid-row: 1;}
+    .design-row .result-title { grid-column: 2; grid-row: 1;}
+    .design-row .editor-title { grid-column: 1 / -1; grid-row: 2;}
+    .design-row .controls { grid-column: 1; grid-row: 3;}
+    .design-row .editor { grid-column: 1 / -1; grid-row: 4; min-height: 250px; }
+    .design-row .result { grid-column: 2; grid-row: 3;}
+     .mockup-grid { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); }
+     .controls, .result { min-height: 250px; }
+}
+@media (max-width: 768px) {
+    body { padding: 10px; font-size: 13px; }
+    h1 { font-size: 1.5em; margin-bottom: 15px;}
+    .global-controls h3 { font-size: 1em;}
+    .design-row { grid-template-columns: 1fr; grid-template-rows: auto auto auto auto auto auto; gap: 10px; padding: 8px; max-height: none; overflow: visible; min-height: unset; }
+     .design-row > div { padding: 8px; }
+     .design-row h3 { font-size: 0.95em; padding-left: 0;}
+     .design-row .controls-title, .design-row .editor-title, .design-row .result-title,
+     .design-row .controls, .design-row .editor, .design-row .result { grid-column: 1; }
+     .design-row .controls-title { grid-row: 1;} .design-row .controls { grid-row: 2;}
+     .design-row .editor-title { grid-row: 3;} .design-row .editor { grid-row: 4;}
+     .design-row .result-title { grid-row: 5;} .design-row .result { grid-row: 6;}
+     .mockup-grid { grid-template-columns: repeat(auto-fill, minmax(55px, 1fr)); gap: 4px; }
+     .hover-popup { display: none !important; }
+     .controls, .editor, .result { min-height: auto; }
+     #addRowButton { font-size: 14px; padding: 8px;}
+     .createMockupButton { font-size: 0.95em; padding: 8px;}
+}
